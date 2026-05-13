@@ -435,8 +435,8 @@
         <input type="range" id="anxiety" min="1" max="10" value="5"
                oninput="document.getElementById('slider-val').innerHTML=this.value+' <span>/ 10</span>'"/>
         <div class="slider-labels">
-          <span>Tâm bất biến</span>
-          <span> Sợ lắm!</span>
+          <span> Tâm bất biến </span>
+          <span>Sợ lắm!</span>
         </div>
       </div>
     </div>
@@ -471,18 +471,8 @@
 </div>
 
 <script>
-/* ── CONFIG GitHub ── */
-/* 
-  ĐỂ LƯU KẾT QUẢ VÀO GITHUB PRIVATE REPO:
-  1. Tạo private repo trên GitHub (vd: "survey-results")
-  2. Vào Settings → Developer settings → Personal access tokens → Fine-grained tokens
-  3. Tạo token với quyền: Contents (Read & Write) cho repo đó
-  4. Điền thông tin bên dưới:
-*/
-const GH_TOKEN  = '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';   // ← thay token của bạn
-const GH_OWNER  = 'Ummactually69';        // ← username GitHub của bạn
-const GH_REPO   = 'khaosat';             // ← tên repo private
-const GH_FILE   = 'data/results.json';          // ← đường dẫn file trong repo
+/* ── CONFIG Google Sheets ── */
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyoBFrOEfA7XTF18oTylASur9tRWkCsgaQwxzHhuVEKZktcezQ8oGW_O-5it3DgiL8/exec';
 
 /* ── Answers store ── */
 const ans = {};
@@ -539,58 +529,23 @@ async function submitSurvey() {
   await saveToGitHub(ans);
 }
 
-/* ── Save to GitHub Private Repo ── */
+/* ── Save to Google Sheets via Apps Script ── */
 async function saveToGitHub(data) {
   const status = document.getElementById('save-status');
   status.textContent = '⟳ Đang lưu kết quả...';
   status.className = 'save-status';
 
   try {
-    // 1. Fetch existing file (if any)
-    let sha = null, existing = [];
-    const getRes = await fetch(
-      `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_FILE}`,
-      { headers: { Authorization: `token ${GH_TOKEN}`, Accept: 'application/vnd.github.v3+json' }}
-    );
-    if (getRes.ok) {
-      const getJson = await getRes.json();
-      sha = getJson.sha;
-      existing = JSON.parse(atob(getJson.content.replace(/\n/g,'')));
-    }
-
-    // 2. Append new result
-    existing.push(data);
-    const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(existing, null, 2))));
-
-    // 3. Push updated file
-    const putBody = { message: `survey: ${data.ten} @ ${data.time}`, content: newContent };
-    if (sha) putBody.sha = sha;
-
-    const putRes = await fetch(
-      `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_FILE}`,
-      {
-        method: 'PUT',
-        headers: {
-          Authorization: `token ${GH_TOKEN}`,
-          Accept: 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(putBody)
-      }
-    );
-
-    if (putRes.ok) {
-      status.textContent = '✦ Kết quả đã được lưu thành công!';
-    } else {
-      throw new Error(putRes.statusText);
-    }
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    status.textContent = '✦ Kết quả đã được lưu thành công!';
   } catch(e) {
-    console.warn('GitHub save error:', e);
-    // Fallback: save to localStorage
-    const local = JSON.parse(localStorage.getItem('survey_results') || '[]');
-    local.push(data);
-    localStorage.setItem('survey_results', JSON.stringify(local));
-    status.textContent = '⚠ Lưu cục bộ (chưa cấu hình GitHub). Xem Console để biết thêm.';
+    console.warn('Save error:', e);
+    status.textContent = '⚠ Không thể lưu kết quả. Vui lòng thử lại.';
     status.className = 'save-status error';
   }
 }
